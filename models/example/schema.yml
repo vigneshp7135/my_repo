@@ -1,0 +1,63 @@
+
+version: 2
+
+models:
+    - name: my_first_dbt_model
+      description: "This lists totals for extended price, discounted extended price, discounted extended price plus tax, average quantity, average extended price, and average discount."
+      tests:
+          - dbt_expectations.expect_table_row_count_to_equal_other_table_times_factor:
+                compare_model: ref("my_second_dbt_model")
+                factor: 2
+          - dbt_expectations.expect_row_values_to_have_data_for_every_n_datepart:
+                date_col: ord_date
+                date_part: day 
+                row_condition: "AGENT_CODE is not null"
+                #test_start_date: "2008-02-15"
+                #test_end_date: {{ modules.datetime.date.today() }}
+                interval: 100
+          - dbt_utils.equality:
+                compare_model: ref('my_second_dbt_model')
+                compare_columns:
+                  - Agent_name
+                  - working_area
+          - dbt_expectations.expect_table_column_count_to_be_between:
+                    min_value: 1
+                    max_value: 9
+          - dbt_expectations.expect_table_column_count_to_equal_other_table:
+              compare_model: ref("my_second_dbt_model")
+      columns:
+          - name: AGENT_NAME
+            description: "The return flag for this table"
+            tests:
+                - not_null
+                - dbt_expectations.expect_column_to_exist
+                - dbt_expectations.expect_column_values_to_have_consistent_casing:
+                    display_inconsistent_columns: true
+                - dbt_utils.cardinality_equality:
+                    field: Agent_name
+                    to: ref('my_second_dbt_model')
+          - name: WORKING_AREA
+            description: "The return flag for this table"
+            tests:
+                - not_null
+          - name: ORD_DATE
+            description: "This expects the regular period of order on yearlt basis"
+            tests:
+                - not_null
+                - dbt_expectations.expect_row_values_to_have_recent_data:
+                      datepart: day
+                      interval: 2
+                - dbt_utils.relationships_where:
+                      to: ref('date_spine')
+                      field: date_spine
+                      from_condition: id <> '4ca448b8-24bf-4b88-96c6-b1609499c38b'
+                      to_condition: created_date >= '2020-01-01'
+          - name: COMMISSION
+            description: "Commision earned by agents"
+            tests:
+                 - dbt_expectations.expect_column_values_to_be_within_n_stdevs:
+                      group_by: ord_date
+                      sigma_threshold: 4
+                
+
+                
